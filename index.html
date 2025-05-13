@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Workflow Designer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Major+Mono+Display&family=Montserrat:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+    <script src="https://unpkg.com/gojs@2.3.11/release/go.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        /* Custom CSS adapted from custom.css and DataInspector.css */
+        body {
+            font-family: 'Montserrat', sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #333; /* Dark background for the page */
+            color: #f0f0f0;
+            overflow-x: hidden; /* Prevent horizontal scroll */
+        }
+
+        /* Navbar specific styles */
+        .brand-logo-title {
+            font-family: 'Major Mono Display', monospace;
+        }
+
+        .main-title-font {
+            font-family: 'Major Mono Display', monospace;
+        }
+
+        .nav-item-font {
+            font-family: 'Montserrat', sans-serif;
+        }
+
+        /* Custom input field styling from custom.css */
+        .input-field-custom input + label { /* This selector might not work as intended without Materialize structure */
+            color: white !important;
+            font-family: 'Montserrat' !important;
+        }
+
+        .input-field-custom input {
+            border-bottom: 1px solid white !important;
+            box-shadow: 0 1px 0 0 white !important;
+            color: white;
+            font-size: 14px;
+            background-color: transparent; /* Ensure input background is transparent */
+        }
+
+        .input-field-custom input:focus {
+            border-bottom: 1px solid lightgreen !important;
+            box-shadow: 0 1px 0 0 lightgreen !important;
+        }
+        
+        .input-field-custom-modal label { /* Simpler label styling for modals */
+            color: #333 !important; 
+            font-size: 0.9rem;
+            margin-bottom: 0.25rem;
+            display: block;
+        }
+
+        .input-field-custom-modal input,
+        .input-field-custom-modal textarea {
+            border: 1px solid #ccc !important;
+            box-shadow: none !important;
+            color: black;
+            padding: 0.5rem;
+            border-radius: 4px;
+            width: 100%;
+        }
+        
+        .input-field-custom-modal input:focus,
+        .input-field-custom-modal textarea:focus {
+            border-color: #2196F3 !important; /* Tailwind blue-500 */
+            box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.3) !important;
+            outline: none;
+        }
+
+        /* Job file preview styles */
+        .job-file-preview {
+            max-height: 200px;
+            overflow-y: auto;
+            background-color: #f5f5f5;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 12px;
+            margin-top: 10px;
+        }
+
+        .job-preview-item {
+            margin-bottom: 8px;
+            padding: 4px 8px;
+            background-color: white;
+            border-radius: 3px;
+            border-left: 3px solid #2196F3;
+        }
+
+        .job-preview-filename {
+            font-weight: bold;
+            color: #2196F3;
+            margin-bottom: 4px;
+        }
+
+        .job-property {
+            color: #666;
+            font-size: 11px;
+        }
+
+        /* Diagram Area */
+        #myDiagramDiv {
+            background-color: #f0f0f0; /* Light background for diagram */
+            background-image: linear-gradient(rgba(0,0,0,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,0.05) 1px, transparent 1px);
+            background-size: 30px 30px;
+            color: #333; /* Text color for diagram content */
+            cursor: grab;
+            min-height: calc(100vh - 64px - 80px); /* Full height minus navbar and some padding */
+            height: 600px; /* Explicit height for GoJS */
+            border-radius: 0.5rem; /* Added rounded corners */
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1); /* Added shadow */
+        }
+
+        /* Inspector Styles adapted from DataInspector.css and custom.css */
+        #myInspectorContainer {
+             max-height: 600px; /* Match diagram height */
+             overflow-y: auto;
+        }
+        #myInspector {
+            font-size: 12px;
+            color: #333; /* Default text color for inspector */
+            background: white !important;
+            box-shadow: 0 2px 2px 0 rgba(0,0,0,0.14), 0 3px 1px -2px rgba(0,0,0,0.12), 0 1px 5px 0 rgba(0,0,0,0.2);
+            padding: 10px;
+            border-radius: 8px;
+        }
+
+        #myInspector table {
+            border-collapse: separate;
+            border-spacing: 0 5px; /* Add vertical spacing between rows */
+            width: 100%;
+        }
+
+        #myInspector td, #myInspector th {
+            padding: 4px;
+            color: #333; /* Darker text for inspector content */
+        }
+        
+        #myInspector table tr td:first-child {
+            text-transform: capitalize;
+            font-weight: bold;
+            color: #555;
+            width: 30%; /* Give more space for labels */
+        }
+
+        #myInspector table tr td input, #myInspector table tr td select {
+            font-size: 12px;
+            color: #333 !important;
+            border: 1px solid #ccc !important;
+            border-radius: 4px;
+            padding: 6px; /* Increased padding */
+            width: 100%; /* Make input take full cell width */
+            box-sizing: border-box;
+        }
+
+        #myInspector table tr td input:focus, #myInspector table tr td select:focus {
+            border-color: #2196F3 !important; /* Tailwind blue-500 */
+            box-shadow: 0 0 0 1px #2196F3 !important;
+            outline: none;
+        }
+        
+        /* Custom toast styles */
+        .toast-custom-container {
+            position: fixed;
+            top: 80px; /* Below navbar */
+            right: 20px;
+            z-index: 10000;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .toast-custom {
+            font-family: 'Montserrat', sans-serif;
+            padding: 12px 18px;
+            border-radius: 6px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            opacity: 0;
+            transform: translateX(100%);
+            transition: opacity 0.3s ease, transform 0.3s ease;
+        }
+        .toast-custom.show {
+            opacity: 1;
+            transform: translateX(0);
+        }
+        .red-toast {
+            background-color: #e53935; /* Red */
+            color: white;
+        }
+        .green-toast {
+            background-color: #00c853; /* Green */
+            color: white;
+        }
+        .blue-toast {
+            background-color: #1e88e5; /* Blue */
+            color: white;
+        }
+
+        /* Modal specific styling (JS will toggle 'hidden' class) */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 9999;
+            transition: opacity 0.3s ease-in-out;
+        }
+        .modal-content-wrapper {
+            position: fixed;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 25px; /* Increased padding */
+            border-radius: 8px;
+            z-index: 10000;
+            transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
+            color: #333;
+            width: 90%;
+            max-width: 500px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+        .modal-close-btn {
+            position: absolute;
+            top: 15px; /* Adjusted position */
+            right: 15px; /* Adjusted position */
+            font-size: 1.8rem; /* Slightly larger */
+            color: #888;
+            cursor: pointer;
+            text-decoration: none;
+            line-height: 1;
+        }
+        .modal-close-btn:hover {
+            color: #333;
+        }
+
+        /* Dropdown with hover */
+        .dropdown {
+            position: relative;
+            display: inline-block;
+        }
+        .dropdown-content {
+            display: none;
+            position: absolute;
+            background-color: #f9f9f9;
+            min-width: 220px; /* Wider dropdown */
+            box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+            z-index: 1000;
+            border-radius: 4px;
+            right: 0; /* Align to the right for navbar items */
+        }
+        .dropdown-content a, .dropdown-content label { /* Style labels like links */
+            color: black;
+            padding: 10px 16px; /* Adjusted padding */
+            text-decoration: none;
+            display: block;
+            font-family: 'Montserrat', sans-serif;
+            font-size: 0.9rem; /* Consistent font size */
+            cursor: pointer;
+        }
+        .dropdown-content a:hover, .dropdown-content label:hover {background-color: #f1f1f1}
+        .dropdown:hover .dropdown-content {
+            display: block;
+        }
+        .dropdown-content i {
+            color: #2196F3; /* Tailwind blue-500 */
+            margin-right: 10px; /* More spacing */
+            width: 16px; /* Align icons */
+            text-align: center;
+        }
+         .dropdown-content li:nth-child(9) a i, .dropdown-content li:nth-child(9) label i { 
+            color: #81c628 !important; 
+        }
+
+
+        /* Custom checkbox style */
+        .custom-checkbox-label {
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            color: white;
+            font-family: 'Montserrat', sans-serif;
+            font-size: 14px; /* Adjusted size */
+        }
+        .custom-checkbox {
+            appearance: none;
+            -webkit-appearance: none;
+            height: 18px; /* Adjusted size */
+            width: 18px;  /* Adjusted size */
+            background-color: #555;
+            border: 1px solid white;
+            border-radius: 3px;
+            cursor: pointer;
+            display: inline-block;
+            position: relative;
+            margin-right: 8px;
+        }
+        .custom-checkbox:checked {
+            background-color: #2196F3; /* Tailwind blue-500 */
+            border-color: #2196F3;
+        }
+        .custom-checkbox:checked::before {
+            content: '\\2714'; /* Checkmark */
+            font-size: 12px; /* Adjusted size */
+            color: white;
+            position: absolute;
+            right: 2px; /* Adjusted position */
+            top: 1px;   /* Adjusted position */
+        }
+        .file-path-display {
+            margin-top: 8px;
+            font-style: italic;
+            color: #555;
+            font-size: 0.8rem;
+        }
+
+        /* Loading overlay styles */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 10001;
+        }
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gray-800 text-gray-100">
+
+    <nav class="bg-gray-700 p-2 flex items-center justify-between shadow-md fixed top-0 left-0 right-0 z-50">
+        <div class="flex items-center">
+            <i class="fas fa-project-diagram text-orange-500 text-3xl mr-2 logo-main-font"></i>
+            <span class="brand-logo-title text-2xl text-orange-500">WorkflowDesigner</span>
+            <div class="ml-6 input-field-custom">
+                <input id="workflow_name" type="text" value="default-workflow" class="workflow_name p-1 rounded text-sm w-64">
+            </div>
+        </div>
+
+        <div class="flex items-center space-x-2">
+            <div class="dropdown nav-item-font">
+                <button class="hover:bg-gray-600 px-3 py-2 rounded text-sm">File</button>
+                <div class="dropdown-content nav-item-font">
+                    <a href="#" id="saveButton"><i class="fas fa-save"></i>Save Workflow</a>
+                    <a href="#" id="openUploadJsonModal"><i class="fas fa-upload"></i>Upload Workflow (JSON)</a>
+                    <a href="#" id="openUploadJobsModal"><i class="fas fa-list-alt"></i>Upload Jobs List (TXT)</a>
+                    <a href="#" id="openUploadZipModal"><i class="fas fa-file-archive"></i>Upload Azkaban Project (ZIP)</a>
+                    <a href="#" id="exportExcelButton"><i class="fas fa-file-excel"></i>Export to Excel</a>
+                    <a href="#" id="exportAzkabanFlowButton"><i class="fas fa-file-code"></i>Export to Azkaban Flow 2.0</a>
+                    <a href="#" id="createAzkabanZipButton"><i class="fas fa-file-archive"></i>Create Azkaban Project Zip</a>
+                    <a href="#" id="openMergeProjectsModal"><i class="fas fa-compress-arrows-alt"></i>Merge Azkaban Projects</a>
+                    <hr class="my-1 border-gray-200">
+                    <a href="#" id="editConfigButton"><i class="fas fa-cog"></i>Edit Config</a>
+                </div>
+            </div>
+
+            <div class="dropdown nav-item-font">
+                <button class="hover:bg-gray-600 px-3 py-2 rounded text-sm">Edit</button>
+                <div class="dropdown-content">
+                    <a href="#" id="undoButton"><i class="fas fa-undo"></i>Undo</a>
+                    <a href="#" id="redoButton"><i class="fas fa-redo"></i>Redo</a>
+                    <a href="#" id="cutButton"><i class="fas fa-cut"></i>Cut Selection</a>
+                    <a href="#" id="copyButton"><i class="fas fa-copy"></i>Copy Selection</a>
+                    <a href="#" id="pasteButton"><i class="fas fa-paste"></i>Paste Selection</a>
+                    <a href="#" id="deleteButton"><i class="fas fa-trash-alt"></i>Delete Selection</a>
+                    <a href="#" id="groupButton"><i class="fas fa-object-group"></i>Group Selection</a>
+                    <a href="#" id="ungroupButton"><i class="fas fa-object-ungroup"></i>Ungroup Selection</a>
+                </div>
+            </div>
+
+            <div class="dropdown nav-item-font">
+                <button class="hover:bg-gray-600 px-3 py-2 rounded text-sm">Add Job</button>
+                <div class="dropdown-content">
+                    <a href="#" id="addEmptyJobButton">Add Empty Job</a>
+                    <a href="#" id="addStartJobButton">Add Start Job</a>
+                    <a href="#" id="addEndJobButton">Add End Job</a>
+                    <a href="#" id="addMergeJobButton">Add Merge Job</a>
+                </div>
+            </div>
+            
+            <div class="dropdown nav-item-font">
+                <button class="hover:bg-gray-600 px-3 py-2 rounded text-sm">View</button>
+                <div class="dropdown-content">
+                     <a href="#" id="layoutButton"><i class="fas fa-project-diagram"></i>Auto Arrange</a>
+                </div>
+            </div>
+
+            <button id="deployButton" class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded text-sm nav-item-font deployButton">
+                <i class="fas fa-rocket mr-1"></i>Deploy
+            </button>
+            <label for="rename_end_job_checkbox" class="custom-checkbox-label text-sm ml-2 rename-end-job">
+                <input type="checkbox" id="rename_end_job_checkbox" class="custom-checkbox">
+                Rename End Job
+            </label>
+        </div>
+    </nav>
+
+    <div class="flex flex-col lg:flex-row p-4 gap-4 mt-16">
+        <div id="myDiagramDiv" class="flex-grow relative">
+        </div>
+
+        <div id="myInspectorContainer" class="w-full lg:w-1/4 xl:w-1/5 bg-gray-700 p-3 rounded-lg shadow-lg">
+            <h3 class="text-lg font-semibold mb-3 text-orange-400 main-title-font">Node Inspector</h3>
+            <div id="myInspector" class="bg-white text-gray-800 p-3 rounded">
+                <p class="text-gray-500">Select a node to see its properties.</p>
+            </div>
+        </div>
+    </div>
+
+    <div id="uploadJsonModal" class="modal-overlay hidden">
+        <div class="modal-content-wrapper modal-custom">
+            <button class="modal-close-btn" data-modal-id="uploadJsonModal">&times;</button>
+            <h4 class="text-xl font-semibold mb-4">Upload Workflow (JSON)</h4>
+            <div class="input-field-custom-modal">
+                <label for="jsonFileInput">Choose JSON File:</label>
+                <input type="file" id="jsonFileInput" accept=".json" class="p-2 border border-gray-300 rounded w-full mb-2">
+                <p id="jsonFilePathDisplay" class="file-path-display">No file selected.</p>
+            </div>
+            <div class="modal-footer mt-6 text-right space-x-2">
+                <button data-modal-id="uploadJsonModal" class="px-4 py-2 bg-gray-300 hover:bg-gray-400 rounded cursor-pointer text-gray-800 modal-cancel-btn">Cancel</button>
+                <button id="confirmJsonUpload" class="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded">Upload</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="uploadJobsModal" class="modal-overlay hidden">
+        <div class="modal-content-wrapper modal-custom">
+            <button class="modal-close-btn" data-modal-id="uploadJobsModal">&times;</button>
+            <h4 class="text-xl font-semibold mb-4">Upload Jobs List (TXT)</h4>
+            <div class="input-field-custom-modal">
+                <label for="jobsFileInput">Choose TXT File:</label>
+                <input type="file" id="jobsFileInput" accept=".txt" class="p-2 border border-gray-300 rounded w-full mb-2">
+                 <p id="jobsFilePathDisplay" class="file-path-display">No file selected.</p>
+            </div>
+            <div class="mt-4">
+                <label for="smartDesignCheckbox" class="flex items-center cursor-pointer text-sm text-gray-700">
+                    <input type="checkbox" id="smartDesignCheckbox" class="custom-checkbox mr-2">
+                    Smart Design (Auto-create Landing Flow)
+                </label>
+            </div>
+            <div class="modal-footer mt-6 text-right space-x-2">
+                <button data-modal-id="uploadJobsModal" class="px-4 py-2 bg-gray-300 hover:bg-gray-400 rounded cursor-pointer text-gray-800 modal-cancel-btn">Cancel</button>
+                <button id="confirmJobsUpload" class="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded">Load Jobs</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="uploadZipModal" class="modal-overlay hidden">
+        <div class="modal-content-wrapper modal-custom" style="max-width: 700px;">
+            <button class="modal-close-btn" data-modal-id="uploadZipModal">&times;</button>
+            <h4 class="text-xl font-semibold mb-4">Upload Azkaban Project (ZIP)</h4>
+            <div class="input-field-custom-modal">
+                <label for="zipFileInput">Choose ZIP File:</label>
+                <input type="file" id="zipFileInput" accept=".zip" class="p-2 border border-gray-300 rounded w-full mb-2">
+                <p id="zipFilePathDisplay" class="file-path-display">No file selected.</p>
+            </div>
+            <div id="jobFilesPreview" class="job-file-preview hidden">
+                <div class="font-semibold text-sm mb-2">Job Files Found:</div>
+                <div id="jobFilesList"></div>
+            </div>
+            <div class="mt-4">
+                <label for="preserveLayoutCheckbox" class="flex items-center cursor-pointer text-sm text-gray-700">
+                    <input type="checkbox" id="preserveLayoutCheckbox" class="custom-checkbox mr-2" checked>
+                    Preserve Layout (Arrange jobs automatically)
+                </label>
+            </div>
+            <div class="modal-footer mt-6 text-right space-x-2">
+                <button data-modal-id="uploadZipModal" class="px-4 py-2 bg-gray-300 hover:bg-gray-400 rounded cursor-pointer text-gray-800 modal-cancel-btn">Cancel</button>
+                <button id="confirmZipUpload" class="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded">Load Project</button>
+            </div>
+        </div>
+    </div>
+    
+    <div id="mergeProjectsModal" class="modal-overlay hidden">
+        <div class="modal-content-wrapper modal-custom">
+            <button class="modal-close-btn" data-modal-id="mergeProjectsModal">&times;</button>
+            <h4 class="text-xl font-semibold mb-4">Merge Azkaban Projects</h4>
+            <div class="input-field-custom-modal mb-4">
+                <label for="merged_project_name">Merged Project Name:</label>
+                <input id="merged_project_name" type="text" class="p-2 border border-gray-300 rounded w-full">
+            </div>
+            <div class="input-field-custom-modal mb-4">
+                <label for="source_projects_list">Source Projects List (comma-separated):</label>
+                <textarea id="source_projects_list" class="p-2 border border-gray-300 rounded w-full h-24" placeholder="projectA, projectB, projectC"></textarea>
+            </div>
+            <div class="modal-footer mt-6 text-right space-x-2">
+                <button data-modal-id="mergeProjectsModal" class="px-4 py-2 bg-gray-300 hover:bg-gray-400 rounded cursor-pointer text-gray-800 modal-cancel-btn">Cancel</button>
+                <button id="confirmMergeProjects" class="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded">Merge Projects</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Config Editor Modal -->
+    <div id="configModal" class="modal-overlay hidden">
+        <div class="modal-content-wrapper modal-custom" style="max-width: 700px;">
+            <button class="modal-close-btn" data-modal-id="configModal">&times;</button>
+            <h4 class="text-xl font-semibold mb-4">Configuration Editor</h4>
+            <div class="space-y-4">
+                <div class="input-field-custom-modal">
+                    <label for="defaultJobType">Default Job Type:</label>
+                    <select id="defaultJobType" class="p-2 border border-gray-300 rounded w-full">
+                        <option value="command">Command</option>
+                        <option value="flow">Flow</option>
+                        <option value="job">Job</option>
+                    </select>
+                </div>
+                <div class="input-field-custom-modal">
+                    <label for="deploymentTarget">Deployment Target:</label>
+                    <input id="deploymentTarget" type="text" class="p-2 border border-gray-300 rounded w-full" placeholder="e.g., https://azkaban.example.com">
+                </div>
+                <div class="input-field-custom-modal">
+                    <label for="projectDescription">Project Description:</label>
+                    <textarea id="projectDescription" class="p-2 border border-gray-300 rounded w-full h-20" placeholder="Enter project description..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer mt-6 text-right space-x-2">
+                <button data-modal-id="configModal" class="px-4 py-2 bg-gray-300 hover:bg-gray-400 rounded cursor-pointer text-gray-800 modal-cancel-btn">Cancel</button>
+                <button id="saveConfigButton" class="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded">Save Config</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading overlay -->
+    <div id="loadingOverlay" class="loading-overlay hidden">
+        <div class="text-center">
+            <div class="spinner"></div>
+            <p class="text-white mt-4" id="loadingText">Processing...</p>
+        </div>
+    </div>
+
+    <div id="toastContainer" class="toast-custom-container"></div>
+
+     <script src="js/app.js"></script>
+</body>
+</html>
